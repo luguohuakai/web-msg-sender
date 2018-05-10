@@ -1,4 +1,6 @@
 <?php
+
+use Endroid\QrCode\QrCode;
 use Workerman\Worker;
 use Workerman\WebServer;
 use Workerman\Lib\Timer;
@@ -37,6 +39,38 @@ $sender_io->on('connection', function($socket){
         $socket->uid = $uid;
         // 更新这个socket对应页面的在线数据
         $socket->emit('update_online_count', "当前<b>{$last_online_count}</b>人在线，共打开<b>{$last_online_page_count}</b>个页面");
+    });
+
+    // 当发来获取二维码事件时
+    $socket->on('qr_code_generator', function($msg)use($socket){
+        // 触发所有客户端定义的 qr_code_generator_from_server 事件
+        // 使用 $msg 生成二维码
+
+
+        $qrCode = new QrCode();
+        $qrCode
+            ->setText($msg)
+            ->setSize(300)
+            ->setPadding(10)
+            ->setErrorCorrection('high')
+            ->setForegroundColor(['r' => 0, 'g' => 0, 'b' => 0, 'a' => 0])
+            ->setBackgroundColor(['r' => 255, 'g' => 255, 'b' => 255, 'a' => 0])
+            ->setLabel('Scan the code')
+            ->setLabelFontSize(16)
+            ->setImageType(QrCode::IMAGE_TYPE_PNG)
+        ;
+
+        // now we can directly output the qrcode
+//        header('Content-Type: '.$qrCode->getContentType());
+//        $qrCode->render();
+
+        // save it to a file
+//        $qrCode->save('qrcode.png');
+
+        // or create a response object
+//        $response = new Response($qrCode->get(), 200, ['Content-Type' => $qrCode->getContentType()]);
+
+        $socket->emit('qr_code_generator_from_server', $qrCode->render());
     });
     
     // 当客户端断开连接是触发（一般是关闭网页或者跳转刷新导致）
