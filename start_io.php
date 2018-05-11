@@ -8,6 +8,31 @@ use PHPSocketIO\SocketIO;
 
 include __DIR__ . '/vendor/autoload.php';
 
+
+//不同环境下获取真实的IP
+function getRealClientIp(){
+    //判断服务器是否允许$_SERVER
+    if(isset($_SERVER)){
+        if(isset($_SERVER['HTTP_X_FORWARDED_FOR'])){
+            $realip = $_SERVER['HTTP_X_FORWARDED_FOR'];
+        }elseif(isset($_SERVER['HTTP_CLIENT_IP'])) {
+            $realip = $_SERVER['HTTP_CLIENT_IP'];
+        }else{
+            $realip = $_SERVER['REMOTE_ADDR'];
+        }
+    }else{
+        //不允许就使用getenv获取
+        if(getenv("HTTP_X_FORWARDED_FOR")){
+            $realip = getenv( "HTTP_X_FORWARDED_FOR");
+        }elseif(getenv("HTTP_CLIENT_IP")) {
+            $realip = getenv("HTTP_CLIENT_IP");
+        }else{
+            $realip = getenv("REMOTE_ADDR");
+        }
+    }
+
+    return $realip;
+}
 // 全局数组保存uid在线数据
 $uidConnectionMap = array();
 // 记录最后一次广播的在线用户数
@@ -41,12 +66,16 @@ $sender_io->on('connection', function($socket){
         $socket->emit('update_online_count', "当前<b>{$last_online_count}</b>人在线，共打开<b>{$last_online_page_count}</b>个页面");
     });
 
+    // 返回客户端ip
+    $socket->on('get_ip',function () use ($socket) {
+        $ip = getRealClientIp();
+        $socket->emit('get_ip_from_server',$ip);
+    });
+
     // 当发来获取二维码事件时
     $socket->on('qr_code_generator', function($msg)use($socket){
         // 触发所有客户端定义的 qr_code_generator_from_server 事件
         // 使用 $msg 生成二维码
-
-
         $qrCode = new QrCode();
         $qrCode
             ->setText($msg)
@@ -70,7 +99,7 @@ $sender_io->on('connection', function($socket){
         // or create a response object
 //        $response = new Response($qrCode->get(), 200, ['Content-Type' => $qrCode->getContentType()]);
 
-        $socket->emit('qr_code_generator_from_server', $qrCode->render());
+        $socket->emit('qr_code_generator_from_server', $qrCode->get());
     });
     
     // 当客户端断开连接是触发（一般是关闭网页或者跳转刷新导致）
